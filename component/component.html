@@ -138,61 +138,74 @@
   <!-- Twitch Extension Helper -->
   <script src="https://extension-files.twitch.tv/helper/v1/twitch-ext.min.js"></script>
   
-  <!-- Muxy SDK with fallback -->
+  <!-- Embedded Muxy SDK (simplified version) -->
   <script>
-    // Keep track of SDK loading status
-    window.muxySDKLoaded = false;
-    
-    // Function to load our local SDK fallback
-    function loadLocalMuxySDK() {
-      console.log("Loading local Muxy SDK fallback...");
-      const script = document.createElement('script');
-      script.src = '/assets/vendor/muxy-sdk.js';
-      script.onload = function() {
-        console.log("Local Muxy SDK loaded successfully");
-        window.muxySDKLoaded = true;
-        // Initialize the SDK once it's loaded
-        document.dispatchEvent(new Event('muxy-sdk-loaded'));
-      };
-      script.onerror = function() {
-        console.error("Failed to load local Muxy SDK");
-        // Continue anyway, we can work without Muxy SDK for basic functionality
-        init();
-      };
-      document.head.appendChild(script);
-    }
-    
-    // Try to load the official SDK first
-    function loadOfficialMuxySDK() {
-      console.log("Attempting to load official Muxy SDK...");
-      const script = document.createElement('script');
-      script.src = 'https://sdk.muxy.io/v2/muxy.js';
-      script.crossOrigin = 'anonymous';
+    (function(window) {
+      console.log("Embedded Muxy SDK initializing...");
       
-      // Set a timeout to detect if the script load hangs
-      const timeoutId = setTimeout(function() {
-        console.warn("Muxy SDK load timed out, falling back to local version");
-        loadLocalMuxySDK();
-      }, 5000);
-      
-      script.onload = function() {
-        clearTimeout(timeoutId);
-        console.log("Official Muxy SDK loaded successfully");
-        window.muxySDKLoaded = true;
-        document.dispatchEvent(new Event('muxy-sdk-loaded'));
+      // Create a simplified Muxy object
+      const Muxy = {
+        /**
+         * Setup the Muxy SDK
+         */
+        setup: function(config = {}) {
+          console.log('Muxy SDK (embedded version) initialized with config:', config);
+          this._config = config || {};
+          
+          // Try to get JWT from URL if present
+          try {
+            const params = new URLSearchParams(window.location.search);
+            const jwt = params.get('jwt') || params.get('token');
+            if (jwt) {
+              this._jwt = jwt;
+              console.log('JWT found in URL parameters');
+            }
+          } catch (e) {
+            console.error('Error parsing URL params:', e);
+          }
+          
+          return this;
+        },
+        
+        /**
+         * State management methods
+         */
+        state: {
+          _store: {},
+          
+          /**
+           * Get extension state
+           */
+          getExtensionState: async function(key) {
+            console.log('getExtensionState called for key:', key);
+            return this._store[key] || null;
+          },
+          
+          /**
+           * Set extension state
+           */
+          setExtensionState: async function(key, value) {
+            console.log('setExtensionState called for key:', key);
+            this._store[key] = value;
+            return { success: true };
+          }
+        },
+        
+        // Other required methods can be added as needed
+        debug: function(message) {
+          console.log('[Muxy Debug]', message);
+        }
       };
       
-      script.onerror = function() {
-        clearTimeout(timeoutId);
-        console.warn("Failed to load official Muxy SDK, falling back to local version");
-        loadLocalMuxySDK();
-      };
+      // Expose Muxy to the global scope
+      window.Muxy = Muxy;
+      window.muxySDKLoaded = true;
       
-      document.head.appendChild(script);
-    }
-    
-    // Start loading the SDK
-    loadOfficialMuxySDK();
+      console.log('Embedded Muxy SDK loaded successfully');
+      
+      // Dispatch the event to signal SDK is loaded
+      document.dispatchEvent(new Event('muxy-sdk-loaded'));
+    })(window);
   </script>
   
   <!-- For demonstration purposes, inline the JS instead of importing modules -->
