@@ -126,8 +126,11 @@
         <div class="admin-section">
           <h3>Admin Actions</h3>
           <button id="publishChangesBtn" class="btn btn-warning w-100 mb-3">Publish Changes</button>
-          <button id="resetDefaultsBtn" class="btn btn-outline-danger w-100">Reset to Defaults</button>
+          <button id="resetDefaultsBtn" class="btn btn-outline-secondary">Reset to Default</button>
         </div>
+        
+        <!-- Message container for notifications -->
+        <div id="messageContainer" class="mt-3"></div>
       </div>
     </div>
   </div>
@@ -203,6 +206,12 @@
          */
         state: {
           _store: {},
+          _defaultSettings: {
+            carouselSpeed: 10,
+            displayMode: 'auto',
+            showPrices: true,
+            gamesList: []
+          },
           
           /**
            * Get extension state
@@ -216,7 +225,7 @@
            * Set extension state
            */
           setExtensionState: async function(key, value) {
-            console.log('setExtensionState called for key:', key);
+            console.log('setExtensionState called for key:', key, value);
             this._store[key] = value;
             return { success: true };
           },
@@ -225,9 +234,45 @@
            * Broadcast extension state
            */
           broadcastExtensionState: async function(key, value) {
-            console.log('broadcastExtensionState called for key:', key);
+            console.log('broadcastExtensionState called for key:', key, value);
             this._store[key] = value;
+            
+            // Show success message
+            const messageContainer = document.getElementById('messageContainer');
+            if (messageContainer) {
+              messageContainer.innerHTML = '<div class="alert alert-success">Changes published successfully!</div>';
+              setTimeout(() => {
+                messageContainer.innerHTML = '';
+              }, 3000);
+            }
+            
             return { success: true };
+          },
+          
+          /**
+           * Reset extension state to defaults
+           */
+          resetExtensionState: async function() {
+            console.log('resetExtensionState called');
+            this._store = JSON.parse(JSON.stringify(this._defaultSettings));
+            
+            // Show success message
+            const messageContainer = document.getElementById('messageContainer');
+            if (messageContainer) {
+              messageContainer.innerHTML = '<div class="alert alert-info">Settings reset to defaults</div>';
+              setTimeout(() => {
+                messageContainer.innerHTML = '';
+              }, 3000);
+            }
+            
+            return { success: true };
+          },
+          
+          /**
+           * Set default settings
+           */
+          setDefaultSettings: function(settings) {
+            this._defaultSettings = settings;
           }
         },
         
@@ -630,12 +675,24 @@
           return;
         }
         
+        // Show saving indicator
+        const messageContainer = document.getElementById('messageContainer');
+        messageContainer.innerHTML = '<div class="alert alert-info">Saving settings...</div>';
+        
         // Save to local state first (will be published later)
         await Muxy.state.setExtensionState('extension_settings', extensionSettings);
-        alert('Settings saved successfully! Click "Publish Changes" to make them live.');
+        
+        // Show success message
+        messageContainer.innerHTML = '<div class="alert alert-success">Settings saved successfully! Click "Publish Changes" to make them live.</div>';
+        
+        // Clear message after delay
+        setTimeout(() => {
+          messageContainer.innerHTML = '';
+        }, 3000);
       } catch (error) {
         console.error('Error saving settings:', error);
-        alert(`Failed to save settings: ${error.message}`);
+        const messageContainer = document.getElementById('messageContainer');
+        messageContainer.innerHTML = `<div class="alert alert-danger">Failed to save settings: ${error.message}</div>`;
       }
     }
 
@@ -647,22 +704,32 @@
         publishBtn.disabled = true;
         publishBtn.textContent = 'Publishing...';
         
+        const messageContainer = document.getElementById('messageContainer');
+        messageContainer.innerHTML = '<div class="alert alert-info">Publishing changes...</div>';
+        
         // Save games list
         await Muxy.state.setExtensionState('carousel_games', { games: gamesList });
         
         // Save settings again to be sure
         await Muxy.state.setExtensionState('extension_settings', extensionSettings);
         
-        // Broadcast update to all viewers
+        // Broadcast update to all viewers - this will trigger all extensions to refresh
         await Muxy.state.broadcastExtensionState('extension_update', { 
           timestamp: Date.now(),
           message: 'Extension updated by admin'
         });
         
-        alert('Changes published successfully! All viewers will see the updated content.');
+        // Show success message
+        messageContainer.innerHTML = '<div class="alert alert-success">Changes published successfully! All viewers will see the updated content.</div>';
+        
+        // Clear message after delay
+        setTimeout(() => {
+          messageContainer.innerHTML = '';
+        }, 5000);
       } catch (error) {
         console.error('Error publishing changes:', error);
-        alert(`Failed to publish changes: ${error.message}`);
+        const messageContainer = document.getElementById('messageContainer');
+        messageContainer.innerHTML = `<div class="alert alert-danger">Failed to publish changes: ${error.message}</div>`;
       } finally {
         const publishBtn = document.getElementById('publishChangesBtn');
         publishBtn.disabled = false;
@@ -671,28 +738,50 @@
     }
 
     // Reset to default settings
-    function resetToDefaults() {
+    async function resetToDefaults() {
       if (confirm('Are you sure you want to reset to default settings and games? This cannot be undone.')) {
-        // Reset to defaults
-        gamesList = [{
-          appId: '1172470',
-          name: 'Apex Legends',
-          url: 'https://store.steampowered.com/app/1172470/Apex_Legends/',
-          image: 'https://cdn.akamai.steamstatic.com/steam/apps/1172470/header.jpg',
-          price: 'Free to Play'
-        }];
-        
-        extensionSettings = {
-          carouselSpeed: 10,
-          displayMode: 'auto',
-          showPrices: true
-        };
-        
-        // Update UI
-        updateGamesListUI();
-        updateSettingsUI();
-        
-        alert('Reset to defaults. Remember to click "Publish Changes" to make them live.');
+        try {
+          const messageContainer = document.getElementById('messageContainer');
+          messageContainer.innerHTML = '<div class="alert alert-info">Resetting to defaults...</div>';
+          
+          // Reset to defaults
+          gamesList = [{
+            appId: '1172470',
+            name: 'Apex Legends',
+            url: 'https://store.steampowered.com/app/1172470/Apex_Legends/',
+            image: 'https://cdn.akamai.steamstatic.com/steam/apps/1172470/header.jpg',
+            price: 'Free to Play'
+          }];
+          
+          extensionSettings = {
+            carouselSpeed: 10,
+            displayMode: 'auto',
+            showPrices: true
+          };
+          
+          // Update UI
+          updateGamesListUI();
+          updateSettingsUI();
+          
+          // Reset state in Muxy
+          await Muxy.state.resetExtensionState();
+          
+          // Set default values to match our UI
+          await Muxy.state.setExtensionState('carousel_games', { games: gamesList });
+          await Muxy.state.setExtensionState('extension_settings', extensionSettings);
+          
+          // Show success message
+          messageContainer.innerHTML = '<div class="alert alert-success">Reset to defaults. Remember to click "Publish Changes" to make them live.</div>';
+          
+          // Clear message after delay
+          setTimeout(() => {
+            messageContainer.innerHTML = '';
+          }, 3000);
+        } catch (error) {
+          console.error('Error resetting to defaults:', error);
+          const messageContainer = document.getElementById('messageContainer');
+          messageContainer.innerHTML = `<div class="alert alert-danger">Failed to reset to defaults: ${error.message}</div>`;
+        }
       }
     }
   </script>
