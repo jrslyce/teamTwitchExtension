@@ -132,6 +132,9 @@
     </div>
   </div>
 
+  <!-- Twitch Extension Helper -->
+  <script src="https://extension-files.twitch.tv/helper/v1/twitch-ext.min.js"></script>
+  
   <!-- Script for Sortable.js to enable drag-and-drop -->
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
   
@@ -159,12 +162,61 @@
       const authStatus = document.getElementById('authStatus');
       
       try {
-        // Initialize the Muxy SDK
+        // Check if Muxy global object exists
+        if (typeof Muxy === 'undefined') {
+          console.error('Muxy SDK not loaded properly');
+          authStatus.className = 'alert alert-danger';
+          authStatus.innerHTML = '<strong>SDK Error:</strong> Muxy SDK failed to load. Please try refreshing the page.';
+          return;
+        }
+        
+        // Initialize the Muxy SDK with proper error handling
+        window.Muxy = Muxy; // Ensure global scope
+        
         Muxy.setup({
-          clientID: 'h03jbtg5wznut8f8330j90dnywpwu2'
+          clientID: 'h03jbtg5wznut8f8330j90dnywpwu2',
+          quiet: false // Enable SDK logging for debugging
         });
         
-        // Check if admin authentication is valid
+        // Get JWT from URL if present (dev.muxy.io passes the admin JWT in URL)
+        const params = new URLSearchParams(window.location.search);
+        const jwt = params.get('jwt') || params.get('token');
+        
+        if (jwt) {
+          try {
+            // Set the admin JWT directly if provided in URL
+            Muxy.setJWT(jwt);
+            adminToken = jwt;
+            authStatus.className = 'alert alert-success';
+            authStatus.innerHTML = '<strong>Authentication Status:</strong> Authenticated as Admin via JWT';
+            
+            // Load games and settings
+            loadGamesAndSettings();
+          } catch (jwtError) {
+            console.error('JWT error:', jwtError);
+            authStatus.className = 'alert alert-warning';
+            authStatus.innerHTML = '<strong>JWT Error:</strong> ' + jwtError.message + '. Trying alternative auth...';
+            
+            // Fall back to standard auth
+            tryStandardAuth();
+          }
+        } else {
+          // No JWT in URL, try standard authentication
+          tryStandardAuth();
+        }
+      } catch (error) {
+        console.error('Muxy SDK initialization error:', error);
+        authStatus.className = 'alert alert-danger';
+        authStatus.innerHTML = `<strong>SDK Error:</strong> ${error.message}`;
+      }
+    }
+    
+    // Try standard authentication if JWT is not provided
+    function tryStandardAuth() {
+      const authStatus = document.getElementById('authStatus');
+      
+      try {
+        // Check if already authenticated
         if (Muxy.user.isLinked() && Muxy.user.isAdmin()) {
           adminToken = Muxy.user.getJWT();
           authStatus.className = 'alert alert-success';
@@ -174,25 +226,31 @@
           loadGamesAndSettings();
         } else {
           // Try to authenticate
-          Muxy.user.authorize(['admin']);
+          authStatus.className = 'alert alert-info';
+          authStatus.innerHTML = '<strong>Authentication Status:</strong> Attempting authentication...';
           
-          // Check again after authorization attempt
-          if (Muxy.user.isLinked() && Muxy.user.isAdmin()) {
-            adminToken = Muxy.user.getJWT();
-            authStatus.className = 'alert alert-success';
-            authStatus.innerHTML = '<strong>Authentication Status:</strong> Authenticated as Admin';
-            
-            // Load games and settings
-            loadGamesAndSettings();
-          } else {
+          Muxy.user.authorize(['admin']).then(() => {
+            if (Muxy.user.isLinked() && Muxy.user.isAdmin()) {
+              adminToken = Muxy.user.getJWT();
+              authStatus.className = 'alert alert-success';
+              authStatus.innerHTML = '<strong>Authentication Status:</strong> Authenticated as Admin';
+              
+              // Load games and settings
+              loadGamesAndSettings();
+            } else {
+              authStatus.className = 'alert alert-danger';
+              authStatus.innerHTML = '<strong>Authentication Error:</strong> This page requires admin privileges. Please ensure you are accessing this page through the proper admin URL.';
+            }
+          }).catch(error => {
+            console.error('Auth error:', error);
             authStatus.className = 'alert alert-danger';
-            authStatus.innerHTML = '<strong>Authentication Error:</strong> This page requires admin privileges. Please ensure you are accessing this page through the proper admin URL.';
-          }
+            authStatus.innerHTML = '<strong>Authentication Error:</strong> ' + error.message;
+          });
         }
       } catch (error) {
-        console.error('Muxy SDK initialization error:', error);
+        console.error('Standard auth error:', error);
         authStatus.className = 'alert alert-danger';
-        authStatus.innerHTML = `<strong>SDK Error:</strong> ${error.message}`;
+        authStatus.innerHTML = '<strong>Authentication Error:</strong> ' + error.message;
       }
     }
 
