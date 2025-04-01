@@ -1,0 +1,20 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "server.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    { "src": "/", "dest": "/server.js" },
+    { "src": "/panel", "dest": "/server.js" },
+    { "src": "/component", "dest": "/server.js" },
+    { "src": "/mobile", "dest": "/server.js" },
+    { "src": "/config", "dest": "/server.js" },
+    { "src": "/admin", "dest": "/server.js" },
+    { "src": "/admin-auth", "dest": "/server.js" },
+    { "src": "/api/(.*)", "dest": "/server.js" },
+    { "src": "/(.*)", "dest": "/server.js" }
+  ]
+}

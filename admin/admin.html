@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Steam Game Extension - Admin Panel</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      padding: 20px;
+      background-color: #f8f9fa;
+    }
+    .admin-header {
+      background-color: #6441a5;
+      color: white;
+      padding: 15px;
+      border-radius: 5px;
+      margin-bottom: 20px;
+    }
+    .game-card {
+      margin-bottom: 15px;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .game-image {
+      width: 100%;
+      height: 150px;
+      object-fit: cover;
+    }
+    .game-info {
+      padding: 15px;
+    }
+    .game-title {
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
+    .badge-steam {
+      background-color: #1b2838;
+      color: white;
+    }
+    .action-buttons {
+      margin-top: 15px;
+    }
+    .drag-handle {
+      cursor: move;
+      color: #6c757d;
+      padding: 5px;
+    }
+    .auth-warning {
+      background-color: #f8d7da;
+      color: #721c24;
+      padding: 15px;
+      border-radius: 5px;
+      margin-bottom: 20px;
+    }
+    .admin-section {
+      background-color: white;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="admin-header">
+      <h1>Steam Game Extension Admin</h1>
+      <p>Manage the games shown in your Twitch extension</p>
+    </div>
+    
+    <div id="authStatus" class="auth-warning">
+      <strong>Authentication Status:</strong> Checking admin authentication...
+    </div>
+    
+    <div class="row">
+      <div class="col-lg-8">
+        <div class="admin-section">
+          <h3>Game Carousel</h3>
+          <p>Manage the games that appear in your extension carousel. Drag to reorder.</p>
+          
+          <div id="gamesList">
+            <!-- Games will be added here dynamically -->
+            <div class="alert alert-info">Loading games...</div>
+          </div>
+          
+          <hr>
+          
+          <h4>Add New Game</h4>
+          <div class="mb-3">
+            <label for="steamUrl" class="form-label">Steam Game URL</label>
+            <input type="text" class="form-control" id="steamUrl" placeholder="https://store.steampowered.com/app/1172470/Apex_Legends/">
+          </div>
+          <button id="addGameBtn" class="btn btn-primary">Add Game</button>
+        </div>
+      </div>
+      
+      <div class="col-lg-4">
+        <div class="admin-section">
+          <h3>Extension Settings</h3>
+          
+          <div class="mb-3">
+            <label for="carouselSpeed" class="form-label">Carousel Speed (seconds)</label>
+            <input type="number" class="form-control" id="carouselSpeed" min="5" max="60" value="10">
+          </div>
+          
+          <div class="mb-3">
+            <label for="displayMode" class="form-label">Default Display Mode</label>
+            <select class="form-select" id="displayMode">
+              <option value="auto">Automatic</option>
+              <option value="manual">Manual Navigation</option>
+            </select>
+          </div>
+          
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="showPrices" checked>
+            <label class="form-check-label" for="showPrices">
+              Show Game Prices
+            </label>
+          </div>
+          
+          <button id="saveSettingsBtn" class="btn btn-success w-100">Save Settings</button>
+        </div>
+        
+        <div class="admin-section">
+          <h3>Admin Actions</h3>
+          <button id="publishChangesBtn" class="btn btn-warning w-100 mb-3">Publish Changes</button>
+          <button id="resetDefaultsBtn" class="btn btn-outline-danger w-100">Reset to Defaults</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Script for Sortable.js to enable drag-and-drop -->
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+  
+  <!-- Muxy SDK -->
+  <script src="https://extension-files.muxy.io/muxy-js-sdk/2.0.0/muxy.js"></script>
+  
+  <script>
+    // Admin state
+    let adminToken = null;
+    let gamesList = [];
+    let extensionSettings = {
+      carouselSpeed: 10,
+      displayMode: 'auto',
+      showPrices: true
+    };
+
+    // Initialize Muxy SDK and admin features
+    document.addEventListener('DOMContentLoaded', async () => {
+      initializeMuxySDK();
+      setupEventListeners();
+    });
+
+    // Initialize Muxy SDK with admin authentication
+    function initializeMuxySDK() {
+      const authStatus = document.getElementById('authStatus');
+      
+      try {
+        // Initialize the Muxy SDK
+        Muxy.setup({
+          clientID: 'h03jbtg5wznut8f8330j90dnywpwu2'
+        });
+        
+        // Check if admin authentication is valid
+        if (Muxy.user.isLinked() && Muxy.user.isAdmin()) {
+          adminToken = Muxy.user.getJWT();
+          authStatus.className = 'alert alert-success';
+          authStatus.innerHTML = '<strong>Authentication Status:</strong> Authenticated as Admin';
+          
+          // Load games and settings
+          loadGamesAndSettings();
+        } else {
+          // Try to authenticate
+          Muxy.user.authorize(['admin']);
+          
+          // Check again after authorization attempt
+          if (Muxy.user.isLinked() && Muxy.user.isAdmin()) {
+            adminToken = Muxy.user.getJWT();
+            authStatus.className = 'alert alert-success';
+            authStatus.innerHTML = '<strong>Authentication Status:</strong> Authenticated as Admin';
+            
+            // Load games and settings
+            loadGamesAndSettings();
+          } else {
+            authStatus.className = 'alert alert-danger';
+            authStatus.innerHTML = '<strong>Authentication Error:</strong> This page requires admin privileges. Please ensure you are accessing this page through the proper admin URL.';
+          }
+        }
+      } catch (error) {
+        console.error('Muxy SDK initialization error:', error);
+        authStatus.className = 'alert alert-danger';
+        authStatus.innerHTML = `<strong>SDK Error:</strong> ${error.message}`;
+      }
+    }
+
+    // Set up event listeners
+    function setupEventListeners() {
+      // Add game button
+      document.getElementById('addGameBtn').addEventListener('click', addGame);
+      
+      // Save settings button
+      document.getElementById('saveSettingsBtn').addEventListener('click', saveSettings);
+      
+      // Publish changes button
+      document.getElementById('publishChangesBtn').addEventListener('click', publishChanges);
+      
+      // Reset to defaults button
+      document.getElementById('resetDefaultsBtn').addEventListener('click', resetToDefaults);
+      
+      // Enable drag and drop for games list
+      const gamesListEl = document.getElementById('gamesList');
+      new Sortable(gamesListEl, {
+        animation: 150,
+        handle: '.drag-handle',
+        onEnd: function() {
+          // Update the order in our gamesList array
+          const gameCards = gamesListEl.querySelectorAll('.game-card');
+          const newOrder = Array.from(gameCards).map(card => card.dataset.appId);
+          gamesList = newOrder.map(appId => gamesList.find(game => game.appId === appId));
+        }
+      });
+    }
+
+    // Load games and settings from Muxy state
+    async function loadGamesAndSettings() {
+      try {
+        // Get games list from Muxy state
+        const response = await Muxy.state.getExtensionState('carousel_games');
+        if (response && response.games) {
+          gamesList = response.games;
+        } else {
+          // Default game if none exist
+          gamesList = [{
+            appId: '1172470',
+            name: 'Apex Legends',
+            url: 'https://store.steampowered.com/app/1172470/Apex_Legends/',
+            image: 'https://cdn.akamai.steamstatic.com/steam/apps/1172470/header.jpg'
+          }];
+        }
+        
+        // Get extension settings
+        const settingsResponse = await Muxy.state.getExtensionState('extension_settings');
+        if (settingsResponse) {
+          extensionSettings = {
+            ...extensionSettings,
+            ...settingsResponse
+          };
+        }
+        
+        // Update UI with loaded data
+        updateGamesListUI();
+        updateSettingsUI();
+      } catch (error) {
+        console.error('Error loading games and settings:', error);
+        document.getElementById('gamesList').innerHTML = `
+          <div class="alert alert-danger">
+            Error loading games: ${error.message}
+          </div>
+        `;
+      }
+    }
+
+    // Add a new game to the carousel
+    async function addGame() {
+      const steamUrlInput = document.getElementById('steamUrl');
+      const url = steamUrlInput.value.trim();
+      
+      if (!url) {
+        alert('Please enter a valid Steam game URL');
+        return;
+      }
+      
+      const appIdMatch = url.match(/\/app\/(\d+)/);
+      if (!appIdMatch || !appIdMatch[1]) {
+        alert('Invalid Steam URL format. Please use a URL like: https://store.steampowered.com/app/1172470/Apex_Legends/');
+        return;
+      }
+      
+      const appId = appIdMatch[1];
+      
+      try {
+        // Show loading state
+        document.getElementById('addGameBtn').disabled = true;
+        document.getElementById('addGameBtn').textContent = 'Loading...';
+        
+        // Fetch game details from Steam API via our proxy
+        const response = await fetch(`/api/steam/details?appids=${appId}`);
+        const data = await response.json();
+        
+        if (!data[appId] || !data[appId].success) {
+          throw new Error('Game not found on Steam');
+        }
+        
+        const gameData = data[appId].data;
+        
+        // Check if game already exists in list
+        if (gamesList.some(game => game.appId === appId)) {
+          alert('This game is already in your carousel');
+          return;
+        }
+        
+        // Add new game to list
+        const newGame = {
+          appId,
+          name: gameData.name,
+          url: url,
+          image: gameData.header_image,
+          price: gameData.is_free ? 'Free to Play' : 
+            (gameData.price_overview ? gameData.price_overview.final_formatted : 'Price not available')
+        };
+        
+        gamesList.push(newGame);
+        
+        // Update UI
+        updateGamesListUI();
+        
+        // Clear input
+        steamUrlInput.value = '';
+      } catch (error) {
+        console.error('Error adding game:', error);
+        alert(`Failed to add game: ${error.message}`);
+      } finally {
+        document.getElementById('addGameBtn').disabled = false;
+        document.getElementById('addGameBtn').textContent = 'Add Game';
+      }
+    }
+
+    // Update the UI with the current games list
+    function updateGamesListUI() {
+      const gamesListEl = document.getElementById('gamesList');
+      
+      if (gamesList.length === 0) {
+        gamesListEl.innerHTML = `
+          <div class="alert alert-warning">
+            No games added yet. Add your first game above.
+          </div>
+        `;
+        return;
+      }
+      
+      let html = '';
+      gamesList.forEach((game, index) => {
+        html += `
+          <div class="card game-card" data-app-id="${game.appId}">
+            <div class="row g-0">
+              <div class="col-md-4">
+                <img src="${game.image}" class="game-image" alt="${game.name}">
+              </div>
+              <div class="col-md-8">
+                <div class="game-info">
+                  <div class="d-flex justify-content-between">
+                    <span class="drag-handle"><i class="bi bi-grip-vertical"></i>≡</span>
+                    <span class="badge badge-steam">${game.price || 'N/A'}</span>
+                  </div>
+                  <h5 class="game-title">${game.name}</h5>
+                  <p class="text-muted small">${game.url}</p>
+                  <div class="action-buttons">
+                    <button class="btn btn-sm btn-outline-danger remove-game" data-index="${index}">Remove</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      });
+      
+      gamesListEl.innerHTML = html;
+      
+      // Add event listeners for remove buttons
+      const removeButtons = document.querySelectorAll('.remove-game');
+      removeButtons.forEach(button => {
+        button.addEventListener('click', () => {
+          const index = parseInt(button.dataset.index);
+          gamesList.splice(index, 1);
+          updateGamesListUI();
+        });
+      });
+    }
+
+    // Update the settings UI with current values
+    function updateSettingsUI() {
+      document.getElementById('carouselSpeed').value = extensionSettings.carouselSpeed;
+      document.getElementById('displayMode').value = extensionSettings.displayMode;
+      document.getElementById('showPrices').checked = extensionSettings.showPrices;
+    }
+
+    // Save extension settings
+    async function saveSettings() {
+      try {
+        // Get values from UI
+        extensionSettings.carouselSpeed = parseInt(document.getElementById('carouselSpeed').value);
+        extensionSettings.displayMode = document.getElementById('displayMode').value;
+        extensionSettings.showPrices = document.getElementById('showPrices').checked;
+        
+        // Validate
+        if (extensionSettings.carouselSpeed < 5 || extensionSettings.carouselSpeed > 60) {
+          alert('Carousel speed must be between 5 and 60 seconds');
+          return;
+        }
+        
+        // Save to local state first (will be published later)
+        await Muxy.state.setExtensionState('extension_settings', extensionSettings);
+        alert('Settings saved successfully! Click "Publish Changes" to make them live.');
+      } catch (error) {
+        console.error('Error saving settings:', error);
+        alert(`Failed to save settings: ${error.message}`);
+      }
+    }
+
+    // Publish all changes (games list and settings)
+    async function publishChanges() {
+      try {
+        // Show loading state
+        const publishBtn = document.getElementById('publishChangesBtn');
+        publishBtn.disabled = true;
+        publishBtn.textContent = 'Publishing...';
+        
+        // Save games list
+        await Muxy.state.setExtensionState('carousel_games', { games: gamesList });
+        
+        // Save settings again to be sure
+        await Muxy.state.setExtensionState('extension_settings', extensionSettings);
+        
+        // Broadcast update to all viewers
+        await Muxy.state.broadcastExtensionState('extension_update', { 
+          timestamp: Date.now(),
+          message: 'Extension updated by admin'
+        });
+        
+        alert('Changes published successfully! All viewers will see the updated content.');
+      } catch (error) {
+        console.error('Error publishing changes:', error);
+        alert(`Failed to publish changes: ${error.message}`);
+      } finally {
+        const publishBtn = document.getElementById('publishChangesBtn');
+        publishBtn.disabled = false;
+        publishBtn.textContent = 'Publish Changes';
+      }
+    }
+
+    // Reset to default settings
+    function resetToDefaults() {
+      if (confirm('Are you sure you want to reset to default settings and games? This cannot be undone.')) {
+        // Reset to defaults
+        gamesList = [{
+          appId: '1172470',
+          name: 'Apex Legends',
+          url: 'https://store.steampowered.com/app/1172470/Apex_Legends/',
+          image: 'https://cdn.akamai.steamstatic.com/steam/apps/1172470/header.jpg',
+          price: 'Free to Play'
+        }];
+        
+        extensionSettings = {
+          carouselSpeed: 10,
+          displayMode: 'auto',
+          showPrices: true
+        };
+        
+        // Update UI
+        updateGamesListUI();
+        updateSettingsUI();
+        
+        alert('Reset to defaults. Remember to click "Publish Changes" to make them live.');
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Steam Game - Mobile View</title>
+  <link rel="stylesheet" href="../common/styles.css">
+  <style>
+    /* Mobile-specific styles */
+    body {
+      background-color: transparent;
+    }
+    
+    .container {
+      width: 100%;
+      max-width: 100%;
+      padding: 8px;
+    }
+    
+    .game-image {
+      width: 100%;
+      max-height: 180px;
+      object-fit: cover;
+    }
+    
+    .game-title {
+      font-size: 1.1em;
+    }
+    
+    .button-container {
+      flex-direction: row;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div id="gameInfo" class="game-container">
+      <div class="loading">Loading game information...</div>
+    </div>
+  </div>
+
+  <!-- Twitch Extension Helper -->
+  <script src="https://extension-files.twitch.tv/helper/v1/twitch-ext.min.js"></script>
+  <script src="mobile.js"></script>
+</body>
+</html>

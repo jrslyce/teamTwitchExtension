@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Steam Game - Configuration</title>
+  <link rel="stylesheet" href="../common/styles.css">
+  <style>
+    /* Config-specific styles */
+    body {
+      background-color: #f7f7f8;
+      color: #18181b;
+    }
+    
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    
+    .config-header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    
+    .config-title {
+      font-size: 1.5em;
+      font-weight: bold;
+      color: var(--twitch-purple);
+    }
+    
+    .config-description {
+      margin-top: 10px;
+      opacity: 0.8;
+    }
+    
+    .config-form {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    
+    .form-group {
+      margin-bottom: 20px;
+    }
+    
+    .form-label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: bold;
+    }
+    
+    .form-input {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+    
+    .preview-container {
+      margin-top: 20px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    
+    .preview-header {
+      background: #f1f1f1;
+      padding: 10px;
+      font-weight: bold;
+      border-bottom: 1px solid #ddd;
+    }
+    
+    .preview-content {
+      padding: 20px;
+      background: var(--twitch-dark);
+    }
+    
+    .save-button {
+      background-color: var(--twitch-purple);
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 10px 16px;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    
+    .save-button:hover {
+      background-color: #772ce8;
+    }
+    
+    .status-message {
+      margin-top: 16px;
+      padding: 10px;
+      border-radius: 4px;
+      text-align: center;
+    }
+    
+    .status-success {
+      background-color: #e3f9e5;
+      color: #1b4332;
+    }
+    
+    .status-error {
+      background-color: #fee2e2;
+      color: #991b1b;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="config-header">
+      <div class="config-title">Steam Game Extension Configuration</div>
+      <div class="config-description">Configure which Steam game to display on your channel</div>
+    </div>
+    
+    <div class="config-form">
+      <div class="form-group">
+        <label for="steamUrl" class="form-label">Steam Game URL</label>
+        <input type="text" id="steamUrl" class="form-input" placeholder="Enter Steam store URL (e.g., https://store.steampowered.com/app/1172470/Apex_Legends/)">
+        <div class="form-help">Enter the full URL to the Steam store page of the game you want to display</div>
+      </div>
+      
+      <button id="previewButton" class="save-button" style="background-color: #6c757d;">Preview</button>
+      <button id="saveButton" class="save-button">Save Configuration</button>
+      
+      <div id="statusMessage" class="status-message" style="display: none;"></div>
+    </div>
+    
+    <div class="preview-container" style="display: none;" id="previewContainer">
+      <div class="preview-header">Preview</div>
+      <div class="preview-content">
+        <div id="gamePreview" class="game-container">
+          <!-- Preview content will be inserted here -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Twitch Extension Helper -->
+  <script src="https://extension-files.twitch.tv/helper/v1/twitch-ext.min.js"></script>
+  <script src="config.js"></script>
+</body>
+</html>

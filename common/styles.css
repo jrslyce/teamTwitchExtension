@@ -1,0 +1,167 @@
+:root {
+  --twitch-purple: #9146FF;
+  --twitch-dark: #18181b;
+  --steam-blue: #1b2838;
+  --steam-accent: #66c0f4;
+}
+
+body {
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+  background-color: var(--twitch-dark);
+  color: white;
+}
+
+.container {
+  padding: 12px;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.game-container {
+  display: flex;
+  flex-direction: column;
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: rgba(0, 0, 0, 0.3);
+}
+
+.game-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 12px;
+  padding: 10px;
+}
+
+.game-title {
+  font-size: 1.2em;
+  font-weight: bold;
+  margin: 8px 0;
+  text-align: center;
+}
+
+.game-image {
+  width: 100%;
+  height: auto;
+  border-radius: 4px 4px 0 0;
+}
+
+.game-details {
+  padding: 8px;
+}
+
+.game-description {
+  font-size: 0.9em;
+  margin-bottom: 12px;
+  max-height: 100px;
+  overflow-y: auto;
+  opacity: 0.9;
+}
+
+.game-meta {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  font-size: 0.8em;
+}
+
+.game-price {
+  font-weight: bold;
+  color: var(--steam-accent);
+}
+
+.button-container {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 12px;
+}
+
+.steam-button {
+  flex: 1;
+  margin: 0 4px;
+  padding: 8px 12px;
+  background-color: var(--steam-blue);
+  border: none;
+  border-radius: 4px;
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.steam-button:hover {
+  background-color: var(--steam-accent);
+  color: var(--steam-blue);
+}
+
+.steam-button img {
+  width: 16px;
+  height: 16px;
+  margin-right: 4px;
+}
+
+.url-input-container {
+  margin-top: 12px;
+  display: flex;
+}
+
+.url-input {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid #444;
+  border-radius: 4px;
+  background-color: rgba(0, 0, 0, 0.3);
+  color: white;
+}
+
+.url-submit {
+  background-color: var(--twitch-purple);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0 10px;
+  margin-left: 4px;
+  cursor: pointer;
+}
+
+.url-submit:hover {
+  background-color: #772ce8;
+}
+
+.loading {
+  text-align: center;
+  padding: 20px;
+  font-style: italic;
+  opacity: 0.7;
+}
+
+.error {
+  color: #ff5252;
+  text-align: center;
+  padding: 10px;
+  font-size: 0.9em;
+}
+
+/* Mobile-specific styles */
+@media (max-width: 320px) {
+  .container {
+    padding: 8px;
+  }
+  
+  .game-title {
+    font-size: 1em;
+  }
+  
+  .button-container {
+    flex-direction: column;
+  }
+  
+  .steam-button {
+    margin: 4px 0;
+  }
+}

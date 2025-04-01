@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Steam Game - Panel View</title>
+  <link rel="stylesheet" href="../common/styles.css">
+  <style>
+    /* Carousel Styles */
+    .carousel-container {
+      position: relative;
+      width: 100%;
+      overflow: hidden;
+    }
+    
+    .carousel {
+      display: flex;
+      transition: transform 0.5s ease;
+      width: 100%;
+    }
+    
+    .carousel-item {
+      min-width: 100%;
+      flex-shrink: 0;
+    }
+    
+    .carousel-nav {
+      display: flex;
+      justify-content: center;
+      margin-top: 10px;
+      gap: 5px;
+    }
+    
+    .carousel-nav-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.5);
+      cursor: pointer;
+    }
+    
+    .carousel-nav-dot.active {
+      background: white;
+    }
+    
+    .carousel-btn {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      background: rgba(0, 0, 0, 0.5);
+      color: white;
+      border: none;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      font-size: 16px;
+      cursor: pointer;
+      z-index: 10;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    
+    .carousel-btn.prev {
+      left: 5px;
+    }
+    
+    .carousel-btn.next {
+      right: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="carousel-container">
+      <button class="carousel-btn prev">←</button>
+      <button class="carousel-btn next">→</button>
+      <div class="carousel" id="gamesCarousel">
+        <!-- Games will be inserted here by JavaScript -->
+        <div class="carousel-item">
+          <div class="game-container">
+            <div class="loading">Loading game information...</div>
+          </div>
+        </div>
+      </div>
+      <div class="carousel-nav" id="carouselNav">
+        <!-- Navigation dots will be inserted here by JavaScript -->
+      </div>
+    </div>
+    
+    <div class="url-input-container">
+      <input type="text" id="steamUrl" class="url-input" placeholder="Enter Steam game URL...">
+      <button id="updateGame" class="url-submit">Update</button>
+    </div>
+  </div>
+
+  <!-- Twitch Extension Helper -->
+  <script src="https://extension-files.twitch.tv/helper/v1/twitch-ext.min.js"></script>
+  
+  <!-- Muxy SDK -->
+  <script src="https://extension-files.muxy.io/muxy-js-sdk/2.0.0/muxy.js"></script>
+  
+  <!-- For demonstration purposes, inline the JS instead of importing modules -->
+  <script>
+    // Simplified version of steamApi.js functionality
+    function extractAppIdFromUrl(url) {
+      if (!url) return null;
+      const appIdMatch = url.match(/\/app\/(\d+)/);
+      return appIdMatch && appIdMatch[1] ? appIdMatch[1] : null;
+    }
+
+    async function fetchGameDetails(appId) {
+      try {
+        // Using our proxy endpoint
+        const response = await fetch(`/api/steam/details?appids=${appId}`);
+        if (!response.ok) {
+          throw new Error(`Steam API returned ${response.status}`);
+        }
+        const data = await response.json();
+        return data[appId].data;
+      } catch (error) {
+        console.error('Error fetching game details:', error);
+        return null;
+      }
+    }
+
+    function generateSteamLinks(appId) {
+      if (!appId) return null;
+      return {
+        store: `https://store.steampowered.com/app/${appId}/`,
+        wishlist: `https://store.steampowered.com/app/${appId}/?snr=twitch_wishlist`,
+        follow: `https://store.steampowered.com/app/${appId}/?snr=twitch_follow`,
+      };
+    }
+
+    // Default Steam games to display
+    const DEFAULT_GAMES = [
+      {
+        appId: '1172470',
+        name: 'Apex Legends',
+        url: 'https://store.steampowered.com/app/1172470/Apex_Legends/',
+        image: null,
+        price: null
+      },
+      {
+        appId: '578080',
+        name: 'PUBG: BATTLEGROUNDS',
+        url: 'https://store.steampowered.com/app/578080/PUBG_BATTLEGROUNDS/',
+        image: null,
+        price: null
+      }
+    ];
+
+    // Extension state
+    let twitch = null;
+    let channelId = null;
+    let gamesList = [];
+    let currentIndex = 0;
+    let autoplayTimer = null;
+    let extensionSettings = {
+      carouselSpeed: 10, // seconds
+      displayMode: 'auto',
+      showPrices: true
+    };
+
+    // Initialize the extension
+    const init = async () => {
+      // Initialize Twitch Helper
+      twitch = window.Twitch ? window.Twitch.ext : null;
+      
+      if (!twitch) {
+        showError('Could not initialize Twitch extension helper');
+        return;
+      }
+
+      // Initialize Muxy SDK for accessing extension state
+      try {
+        Muxy.setup({
+          clientID: 'h03jbtg5wznut8f8330j90dnywpwu2'
+        });
+      } catch (e) {
+        console.error('Error initializing Muxy SDK:', e);
+      }
+      
+      // Listen for authentication events
+      twitch.onAuthorized(async (auth) => {
+        channelId = auth.channelId;
+        
+        try {
+          // Load games list and settings from extension state
+          await loadGamesAndSettings();
+          
+          // Set up carousel autoplay if needed
+          if (extensionSettings.displayMode === 'auto') {
+            startAutoplay();
+          }
+        } catch (error) {
+          console.error('Error loading extension data:', error);
+          // Fall back to default games
+          gamesList = [...DEFAULT_GAMES];
+          await loadGameDetails();
+        }
+      });
+
+      // Set up UI event listeners
+      document.getElementById('updateGame').addEventListener('click', updateGameFromInput);
+      document.getElementById('steamUrl').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') updateGameFromInput();
+      });
+      
+      // Set up carousel navigation
+      setupCarouselNavigation();
+      
+      // Load default games if Twitch auth fails or is slow
+      setTimeout(() => {
+        if (gamesList.length === 0) {
+          gamesList = [...DEFAULT_GAMES];
+          loadGameDetails();
+        }
+      }, 3000);
+    };
+
+    // Load games and settings from Muxy state
+    async function loadGamesAndSettings() {
+      try {
+        // Get games list from Muxy state
+        const response = await Muxy.state.getExtensionState('carousel_games');
+        if (response && response.games && response.games.length > 0) {
+          gamesList = response.games;
+        } else {
+          gamesList = [...DEFAULT_GAMES];
+        }
+        
+        // Get extension settings
+        const settingsResponse = await Muxy.state.getExtensionState('extension_settings');
+        if (settingsResponse) {
+          extensionSettings = {
+            ...extensionSettings,
+            ...settingsResponse
+          };
+        }
+        
+        // Load details for games that need it
+        await loadGameDetails();
+      } catch (error) {
+        console.error('Error loading games and settings:', error);
+        gamesList = [...DEFAULT_GAMES];
+        await loadGameDetails();
+      }
+    }
+
+    // Load game details for all games in the carousel
+    async function loadGameDetails() {
+      showLoading();
+      
+      try {
+        // Load details for each game that doesn't have complete info
+        for (let i = 0; i < gamesList.length; i++) {
+          const game = gamesList[i];
+          if (!game.image || !game.price) {
+            const gameData = await fetchGameDetails(game.appId);
+            if (gameData) {
+              game.name = gameData.name;
+              game.image = gameData.header_image;
+              game.price = gameData.is_free ? 'Free to Play' : 
+                (gameData.price_overview ? gameData.price_overview.final_formatted : 'Price not available');
+            }
+          }
+        }
+        
+        // Initialize carousel
+        renderCarousel();
+      } catch (error) {
+        console.error('Error loading game details:', error);
+        showError('Failed to load game information');
+      }
+    }
+
+    // Render the carousel with all games
+    function renderCarousel() {
+      if (gamesList.length === 0) {
+        showError('No games available');
+        return;
+      }
+      
+      const carousel = document.getElementById('gamesCarousel');
+      const carouselNav = document.getElementById('carouselNav');
+      
+      // Create carousel items
+      let carouselHTML = '';
+      gamesList.forEach((game, index) => {
+        const steamLinks = generateSteamLinks(game.appId);
+        
+        carouselHTML += `
+          <div class="carousel-item" data-index="${index}">
+            <div class="game-container">
+              <img class="game-image" src="${game.image}" alt="${game.name}">
+              <div class="game-header">
+                <div class="game-title">${game.name}</div>
+                <div class="game-meta">
+                  ${extensionSettings.showPrices ? `<span class="game-price">${game.price}</span>` : ''}
+                </div>
+              </div>
+              <div class="game-details">
+                <div class="button-container">
+                  <a href="${steamLinks.wishlist}" target="_blank" class="steam-button">
+                    Wishlist
+                  </a>
+                  <a href="${steamLinks.follow}" target="_blank" class="steam-button">
+                    Follow
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      });
+      
+      carousel.innerHTML = carouselHTML;
+      
+      // Create navigation dots
+      let navDotsHTML = '';
+      gamesList.forEach((_, index) => {
+        navDotsHTML += `<div class="carousel-nav-dot${index === 0 ? ' active' : ''}" data-index="${index}"></div>`;
+      });
+      
+      carouselNav.innerHTML = navDotsHTML;
+      
+      // Set up dot navigation
+      const dots = document.querySelectorAll('.carousel-nav-dot');
+      dots.forEach(dot => {
+        dot.addEventListener('click', () => {
+          goToSlide(parseInt(dot.dataset.index));
+        });
+      });
+      
+      // Show the first slide
+      goToSlide(0);
+    }
+
+    // Set up carousel navigation buttons
+    function setupCarouselNavigation() {
+      const prevBtn = document.querySelector('.carousel-btn.prev');
+      const nextBtn = document.querySelector('.carousel-btn.next');
+      
+      prevBtn.addEventListener('click', () => {
+        goToSlide(currentIndex - 1);
+      });
+      
+      nextBtn.addEventListener('click', () => {
+        goToSlide(currentIndex + 1);
+      });
+    }
+
+    // Go to a specific slide in the carousel
+    function goToSlide(index) {
+      if (gamesList.length === 0) return;
+      
+      // Reset autoplay timer if active
+      if (autoplayTimer) {
+        clearTimeout(autoplayTimer);
+        if (extensionSettings.displayMode === 'auto') {
+          startAutoplay();
+        }
+      }
+      
+      // Handle wrapping around
+      if (index < 0) {
+        index = gamesList.length - 1;
+      } else if (index >= gamesList.length) {
+        index = 0;
+      }
+      
+      currentIndex = index;
+      
+      // Update carousel position
+      const carousel = document.getElementById('gamesCarousel');
+      carousel.style.transform = `translateX(-${currentIndex * 100}%)`;
+      
+      // Update active dot
+      const dots = document.querySelectorAll('.carousel-nav-dot');
+      dots.forEach(dot => {
+        dot.classList.remove('active');
+      });
+      
+      const activeDot = document.querySelector(`.carousel-nav-dot[data-index="${currentIndex}"]`);
+      if (activeDot) {
+        activeDot.classList.add('active');
+      }
+    }
+
+    // Start autoplay for carousel
+    function startAutoplay() {
+      if (autoplayTimer) {
+        clearTimeout(autoplayTimer);
+      }
+      
+      const speed = extensionSettings.carouselSpeed * 1000; // convert to ms
+      
+      autoplayTimer = setTimeout(() => {
+        goToSlide(currentIndex + 1);
+      }, speed);
+    }
+
+    // Update game from the input field
+    const updateGameFromInput = async () => {
+      const steamUrlInput = document.getElementById('steamUrl');
+      const newSteamUrl = steamUrlInput.value.trim();
+      
+      if (!newSteamUrl) {
+        showError('Please enter a valid Steam URL');
+        return;
+      }
+      
+      const appId = extractAppIdFromUrl(newSteamUrl);
+      if (!appId) {
+        showError('Invalid Steam URL');
+        return;
+      }
+      
+      showLoading();
+      
+      try {
+        const gameData = await fetchGameDetails(appId);
+        if (!gameData) {
+          showError('Could not load game data');
+          return;
+        }
+        
+        // Check if this game is already in the carousel
+        const existingIndex = gamesList.findIndex(game => game.appId === appId);
+        
+        if (existingIndex >= 0) {
+          // Go to that slide
+          goToSlide(existingIndex);
+        } else {
+          // Add the new game to the carousel
+          const newGame = {
+            appId,
+            name: gameData.name,
+            url: newSteamUrl,
+            image: gameData.header_image,
+            price: gameData.is_free ? 'Free to Play' : 
+              (gameData.price_overview ? gameData.price_overview.final_formatted : 'Price not available')
+          };
+          
+          gamesList.push(newGame);
+          
+          // Save updated games list if possible
+          if (Muxy.state && channelId) {
+            try {
+              await Muxy.state.setExtensionState('carousel_games', { games: gamesList });
+            } catch (e) {
+              console.error('Error saving games list:', e);
+            }
+          }
+          
+          // Re-render carousel
+          renderCarousel();
+          
+          // Go to the new game
+          goToSlide(gamesList.length - 1);
+        }
+        
+        // Clear input
+        steamUrlInput.value = '';
+      } catch (error) {
+        console.error('Error updating game:', error);
+        showError('Failed to update game information');
+      }
+    };
+
+    // Show loading state
+    const showLoading = () => {
+      const carousel = document.getElementById('gamesCarousel');
+      carousel.innerHTML = `
+        <div class="carousel-item">
+          <div class="game-container">
+            <div class="loading">Loading game information...</div>
+          </div>
+        </div>
+      `;
+    };
+
+    // Show error message
+    const showError = (message) => {
+      const carousel = document.getElementById('gamesCarousel');
+      carousel.innerHTML = `
+        <div class="carousel-item">
+          <div class="game-container">
+            <div class="error">${message}</div>
+          </div>
+        </div>
+      `;
+    };
+
+    // Initialize when the DOM is ready
+    document.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>
