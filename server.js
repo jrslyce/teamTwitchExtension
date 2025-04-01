@@ -15,10 +15,27 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 8081;
 
+// Enhanced CORS configuration
+const corsOptions = {
+  origin: '*',
+  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+  preflightContinue: false,
+  optionsSuccessStatus: 204,
+  allowedHeaders: 'Content-Type,Authorization'
+};
+
 // Middleware
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '/')));
+
+// API request middleware to add CORS headers for all API routes
+app.use('/api', (req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type,Authorization');
+  next();
+});
 
 // Root route - redirect to panel
 app.get('/', (req, res) => {
