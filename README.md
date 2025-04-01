@@ -80,3 +80,4 @@ This extension uses the MCP model context protocol for integration with dev.muxy
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+# teamTwitchExtension
