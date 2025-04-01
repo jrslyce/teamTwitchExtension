@@ -41,7 +41,19 @@
         throw new Error('Invalid JWT provided');
       }
       this._jwt = jwt;
-      console.log('JWT set manually');
+      console.log('JWT set manually with setJWT');
+      return this;
+    },
+    
+    /**
+     * Set token (alias for setJWT, as per documentation)
+     */
+    setToken: function(token) {
+      if (!token) {
+        throw new Error('Invalid token provided');
+      }
+      this._jwt = token;
+      console.log('Token set manually with setToken');
       return this;
     },
     

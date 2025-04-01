@@ -232,38 +232,34 @@
           return;
         }
         
-        // Initialize the Muxy SDK with proper error handling
+        // Initialize the Muxy SDK following official documentation
+        // https://docs.muxy.io/docs/install-manually
         window.Muxy = Muxy; // Ensure global scope
         
+        // Setup SDK with client ID
         Muxy.setup({
           clientID: 'h03jbtg5wznut8f8330j90dnywpwu2',
           quiet: false // Enable SDK logging for debugging
         });
         
-        // Get JWT from URL if present (dev.muxy.io passes the admin JWT in URL)
+        // First check if we have a JWT in the URL (from dev.muxy.io)
         const params = new URLSearchParams(window.location.search);
         const jwt = params.get('jwt') || params.get('token');
         
         if (jwt) {
-          try {
-            // Set the admin JWT directly if provided in URL
-            Muxy.setJWT(jwt);
-            adminToken = jwt;
-            authStatus.className = 'alert alert-success';
-            authStatus.innerHTML = '<strong>Authentication Status:</strong> Authenticated as Admin via JWT';
-            
-            // Load games and settings
-            loadGamesAndSettings();
-          } catch (jwtError) {
-            console.error('JWT error:', jwtError);
-            authStatus.className = 'alert alert-warning';
-            authStatus.innerHTML = '<strong>JWT Error:</strong> ' + jwtError.message + '. Trying alternative auth...';
-            
-            // Fall back to standard auth
-            tryStandardAuth();
-          }
+          console.log('JWT found in URL, using direct authentication');
+          // Directly authenticate with the provided JWT
+          Muxy.setToken(jwt); // According to docs, use setToken instead of setJWT
+          
+          adminToken = jwt;
+          authStatus.className = 'alert alert-success';
+          authStatus.innerHTML = '<strong>Authentication Status:</strong> Authenticated as Admin via JWT';
+          
+          // Load games and settings
+          loadGamesAndSettings();
         } else {
-          // No JWT in URL, try standard authentication
+          console.log('No JWT in URL, trying traditional authentication flow');
+          // Try standard authentication
           tryStandardAuth();
         }
       } catch (error) {
