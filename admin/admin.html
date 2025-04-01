@@ -138,8 +138,62 @@
   <!-- Script for Sortable.js to enable drag-and-drop -->
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
   
-  <!-- Muxy SDK -->
-  <script src="https://extension-files.muxy.io/muxy-js-sdk/2.0.0/muxy.js" crossorigin="anonymous"></script>
+  <!-- Muxy SDK with fallback -->
+  <script>
+    // Keep track of SDK loading status
+    window.muxySDKLoaded = false;
+    
+    // Function to load our local SDK fallback
+    function loadLocalMuxySDK() {
+      console.log("Loading local Muxy SDK fallback...");
+      const script = document.createElement('script');
+      script.src = '/assets/vendor/muxy-sdk.js';
+      script.onload = function() {
+        console.log("Local Muxy SDK loaded successfully");
+        window.muxySDKLoaded = true;
+        // Initialize the SDK once it's loaded
+        document.dispatchEvent(new Event('muxy-sdk-loaded'));
+      };
+      script.onerror = function() {
+        console.error("Failed to load local Muxy SDK");
+        document.getElementById('authStatus').className = 'alert alert-danger';
+        document.getElementById('authStatus').innerHTML = '<strong>Critical Error:</strong> Failed to load Muxy SDK. Please contact support.';
+      };
+      document.head.appendChild(script);
+    }
+    
+    // Try to load the official SDK first
+    function loadOfficialMuxySDK() {
+      console.log("Attempting to load official Muxy SDK...");
+      const script = document.createElement('script');
+      script.src = 'https://extension-files.muxy.io/muxy-js-sdk/2.0.0/muxy.js';
+      script.crossOrigin = 'anonymous';
+      
+      // Set a timeout to detect if the script load hangs
+      const timeoutId = setTimeout(function() {
+        console.warn("Muxy SDK load timed out, falling back to local version");
+        loadLocalMuxySDK();
+      }, 5000);
+      
+      script.onload = function() {
+        clearTimeout(timeoutId);
+        console.log("Official Muxy SDK loaded successfully");
+        window.muxySDKLoaded = true;
+        document.dispatchEvent(new Event('muxy-sdk-loaded'));
+      };
+      
+      script.onerror = function() {
+        clearTimeout(timeoutId);
+        console.warn("Failed to load official Muxy SDK, falling back to local version");
+        loadLocalMuxySDK();
+      };
+      
+      document.head.appendChild(script);
+    }
+    
+    // Start loading the SDK
+    loadOfficialMuxySDK();
+  </script>
   
   <script>
     // Admin state
@@ -152,9 +206,17 @@
     };
 
     // Initialize Muxy SDK and admin features
-    document.addEventListener('DOMContentLoaded', async () => {
-      initializeMuxySDK();
-      setupEventListeners();
+    document.addEventListener('DOMContentLoaded', function() {
+      // Wait for either SDK to be loaded before initializing
+      if (window.muxySDKLoaded) {
+        initializeMuxySDK();
+        setupEventListeners();
+      } else {
+        document.addEventListener('muxy-sdk-loaded', function() {
+          initializeMuxySDK();
+          setupEventListeners();
+        });
+      }
     });
 
     // Initialize Muxy SDK with admin authentication
